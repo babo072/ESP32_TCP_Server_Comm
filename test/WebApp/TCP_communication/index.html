@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 TCP 서버 테스터</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .connection-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .connection-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+
+        .input-group input {
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s;
+            min-width: 150px;
+        }
+
+        .status-disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        .status-connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeaa7;
+        }
+
+        .status-connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .dot-red { background-color: #dc3545; }
+        .dot-yellow { background-color: #ffc107; }
+        .dot-green { background-color: #28a745; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
+        }
+
+        .btn:disabled {
+            background: #6c757d !important;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .communication-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .panel h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .message-log {
+            height: 350px;
+            overflow-y: auto;
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .message {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 5px;
+            word-wrap: break-word;
+        }
+
+        .message-sent {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+
+        .message-received {
+            background-color: #e8f5e8;
+            border-left: 4px solid #4caf50;
+        }
+
+        .message-system {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            font-style: italic;
+        }
+
+        .message-error {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+            color: #d32f2f;
+        }
+
+        .message-connecting {
+            background-color: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 11px;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .send-panel {
+            margin-top: 15px;
+        }
+
+        .send-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .message-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .quick-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 15px;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-small:hover {
+            background: #dee2e6;
+            transform: translateY(-1px);
+        }
+
+        .stats-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .esp32-info {
+            background: #e8f4fd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .esp32-info h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .esp32-info p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        @media (max-width: 768px) {
+            .communication-panel {
+                grid-template-columns: 1fr;
+            }
+            
+            .connection-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .send-row {
+                flex-direction: column;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 ESP32 TCP 테스터</h1>
+            <p>ESP32 TCP 서버와 실시간 통신을 테스트하세요</p>
+        </div>
+
+        <div class="esp32-info">
+            <h4>📡 ESP32 설정 확인</h4>
+            <p><strong>1.</strong> ESP32에 제공된 코드를 업로드하세요</p>
+            <p><strong>2.</strong> 시리얼 모니터에서 "IP Address:" 다음에 나오는 IP를 확인하세요</p>
+            <p><strong>3.</strong> ESP32와 같은 네트워크에 연결되어 있는지 확인하세요</p>
+            <p><strong>4.</strong> 포트는 10000번을 사용합니다</p>
+        </div>
+
+        <div class="connection-panel">
+            <div class="connection-row">
+                <div class="input-group">
+                    <label for="esp32-ip">ESP32 IP 주소</label>
+                    <input type="text" id="esp32-ip" placeholder="192.168.1.100" value="">
+                </div>
+                <div class="input-group">
+                    <label for="esp32-port">포트</label>
+                    <input type="number" id="esp32-port" placeholder="10000" value="10000">
+                </div>
+                <div class="input-group">
+                    <label>연결 상태</label>
+                    <div id="connection-status" class="status-indicator status-disconnected">
+                        <div class="status-dot dot-red"></div>
+                        연결 안됨
+                    </div>
+                </div>
+            </div>
+            <div class="connection-row">
+                <button id="connect-btn" class="btn btn-primary">연결</button>
+                <button id="disconnect-btn" class="btn btn-danger" disabled>연결 해제</button>
+                <button id="clear-log-btn" class="btn" style="background: #6c757d; color: white;">로그 지우기</button>
+                <button id="ping-btn" class="btn" style="background: #17a2b8; color: white;" disabled>연결 테스트</button>
+            </div>
+        </div>
+
+        <div class="communication-panel">
+            <div class="panel">
+                <h3>📨 메시지 전송</h3>
+                <div class="send-panel">
+                    <div class="send-row">
+                        <input type="text" id="message-input" class="message-input" 
+                               placeholder="ESP32로 보낼 메시지를 입력하세요..." maxlength="100">
+                        <button id="send-btn" class="btn btn-primary" disabled>전송</button>
+                    </div>
+                    <div class="quick-buttons">
+                        <button class="btn-small" onclick="sendQuickMessage('Hello ESP32!')">Hello ESP32!</button>
+                        <button class="btn-small" onclick="sendQuickMessage('LED ON')">LED ON</button>
+                        <button class="btn-small" onclick="sendQuickMessage('LED OFF')">LED OFF</button>
+                        <button class="btn-small" onclick="sendQuickMessage('STATUS')">STATUS</button>
+                        <button class="btn-small" onclick="sendQuickMessage('TEST 123')">TEST 123</button>
+                        <button class="btn-small" onclick="sendQuickMessage('GET SENSORS')">GET SENSORS</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>📋 통신 로그</h3>
+                <div id="message-log" class="message-log">
+                    <div class="message message-system">
+                        <span class="timestamp">[시스템]</span>
+                        ESP32 IP와 포트를 입력하고 연결 버튼을 클릭하세요.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-panel">
+            <h3>📊 통신 통계</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="sent-count">0</div>
+                    <div class="stat-label">전송한 메시지</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="received-count">0</div>
+                    <div class="stat-label">받은 메시지</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="connection-time">00:00</div>
+                    <div class="stat-label">연결 시간</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="last-response">-</div>
+                    <div class="stat-label">최근 응답 시간</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ESP32TcpTester {
+            constructor() {
+                this.socket = null;
+                this.connected = false;
+                this.sentCount = 0;
+                this.receivedCount = 0;
+                this.connectionStartTime = null;
+                this.connectionTimer = null;
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.connectWebSocket();
+            }
+
+            initializeElements() {
+                this.ipInput = document.getElementById('esp32-ip');
+                this.portInput = document.getElementById('esp32-port');
+                this.connectBtn = document.getElementById('connect-btn');
+                this.disconnectBtn = document.getElementById('disconnect-btn');
+                this.sendBtn = document.getElementById('send-btn');
+                this.messageInput = document.getElementById('message-input');
+                this.messageLog = document.getElementById('message-log');
+                this.connectionStatus = document.getElementById('connection-status');
+                this.clearLogBtn = document.getElementById('clear-log-btn');
+                this.pingBtn = document.getElementById('ping-btn');
+                
+                // 통계 요소들
+                this.sentCountEl = document.getElementById('sent-count');
+                this.receivedCountEl = document.getElementById('received-count');
+                this.connectionTimeEl = document.getElementById('connection-time');
+                this.lastResponseEl = document.getElementById('last-response');
+            }
+
+            bindEvents() {
+                this.connectBtn.addEventListener('click', () => this.connect());
+                this.disconnectBtn.addEventListener('click', () => this.disconnect());
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.clearLogBtn.addEventListener('click', () => this.clearLog());
+                this.pingBtn.addEventListener('click', () => this.ping());
+                
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.sendMessage();
+                    }
+                });
+
+                this.messageInput.addEventListener('input', () => {
+                    this.sendBtn.disabled = !this.connected || !this.messageInput.value.trim();
+                });
+            }
+
+            connectWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}`;
+                
+                this.socket = new WebSocket(wsUrl);
+                
+                this.socket.onopen = () => {
+                    this.addMessage('system', 'WebSocket 프록시에 연결되었습니다.');
+                };
+                
+                this.socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this.handleWebSocketMessage(data);
+                    } catch (e) {
+                        console.error('WebSocket 메시지 파싱 오류:', e);
+                    }
+                };
+                
+                this.socket.onclose = () => {
+                    this.addMessage('system', 'WebSocket 연결이 끊어졌습니다. 페이지를 새로고침해주세요.', 'error');
+                };
+                
+                this.socket.onerror = (error) => {
+                    this.addMessage('system', 'WebSocket 오류가 발생했습니다.', 'error');
+                };
+            }
+
+            handleWebSocketMessage(data) {
+                switch(data.type) {
+                    case 'connecting':
+                        this.updateConnectionStatus('connecting');
+                        this.addMessage('system', data.message, 'connecting');
+                        break;
+                        
+                    case 'connected':
+                        this.connected = true;
+                        this.connectionStartTime = Date.now();
+                        this.startConnectionTimer();
+                        this.updateConnectionStatus('connected');
+                        this.addMessage('system', data.message);
+                        this.connectBtn.disabled = true;
+                        this.disconnectBtn.disabled = false;
+                        this.pingBtn.disabled = false;
+                        this.sendBtn.disabled = false;
+                        break;
+                        
+                    case 'disconnected':
+                        this.handleDisconnection();
+                        this.addMessage('system', data.message);
+                        break;
+                        
+                    case 'error':
+                        this.handleDisconnection();
+                        this.addMessage('system', data.message, 'error');
+                        break;
+                        
+                    case 'sent':
+                        // 전송 확인은 이미 UI에서 처리됨
+                        break;
+                        
+                    case 'received':
+                        this.addMessage('received', data.message);
+                        this.receivedCount++;
+                        this.lastResponseEl.textContent = new Date(data.timestamp).toLocaleTimeString();
+                        this.updateStats();
+                        break;
+                        
+                    case 'pong':
+                        this.addMessage('system', `연결 상태: ${data.connected ? '정상' : '끊어짐'}`);
+                        break;
+                }
+            }
+
+            connect() {
+                const ip = this.ipInput.value.trim();
+                const port = parseInt(this.portInput.value);
+
+                if (!ip || !port) {
+                    this.addMessage('system', 'IP 주소와 포트를 정확히 입력해주세요.', 'error');
+                    return;
+                }
+
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({
+                        type: 'connect',
+                        ip: ip,
+                        port: port
+                    }));
+                } else {
+                    this.addMessage('system', 'WebSocket 연결이 끊어졌습니다. 페이지를 새로고침해주세요.', 'error');
+                }
+            }
+
+            disconnect() {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({
+                        type: 'disconnect'
+                    }));
+                }
+                this.handleDisconnection();
+            }
+
+            handleDisconnection() {
+                this.connected = false;
+                this.stopConnectionTimer();
+                this.updateConnectionStatus('disconnected');
+                
+                this.connectBtn.disabled = false;
+                this.disconnectBtn.disabled = true;
+                this.sendBtn.disabled = true;
+                this.pingBtn.disabled = true;
+            }
+
+            sendMessage() {
+                const message = this.messageInput.value.trim();
+                if (!message || !this.connected) return;
+
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({
+                        type: 'send',
+                        message: message
+                    }));
+                    
+                    this.addMessage('sent', message);
+                    this.messageInput.value = '';
+                    this.sentCount++;
+                    this.updateStats();
+                } else {
+                    this.addMessage('system', 'WebSocket 연결이 끊어졌습니다.', 'error');
+                }
+            }
+
+            ping() {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({
+                        type: 'ping'
+                    }));
+                }
+            }
+
+            addMessage(type, content, subtype = '') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message message-${type} ${subtype ? 'message-' + subtype : ''}`;
+                
+                const timestamp = new Date().toLocaleTimeString();
+                const typeLabel = {
+                    'sent': '보냄',
+                    'received': '받음',
+                    'system': '시스템',
+                    'connecting': '연결'
+                }[type] || type;
+                
+                messageDiv.innerHTML = `
+                    <span class="timestamp">[${timestamp}] ${typeLabel}</span>
+                    ${content}
+                `;
+                
+                this.messageLog.appendChild(messageDiv);
+                this.messageLog.scrollTop = this.messageLog.scrollHeight;
+            }
+
+            updateConnectionStatus(status) {
+                const statusConfig = {
+                    'disconnected': {
+                        class: 'status-disconnected',
+                        dot: 'dot-red',
+                        text: '연결 안됨'
+                    },
+                    'connecting': {
+                        class: 'status-connecting',
+                        dot: 'dot-yellow',
+                        text: '연결 중...'
+                    },
+                    'connected': {
+                        class: 'status-connected',
+                        dot: 'dot-green',
+                        text: '연결됨'
+                    }
+                };
+
+                const config = statusConfig[status];
+                this.connectionStatus.className = `status-indicator ${config.class}`;
+                this.connectionStatus.innerHTML = `
+                    <div class="status-dot ${config.dot}"></div>
+                    ${config.text}
+                `;
+            }
+
+            startConnectionTimer() {
+                this.connectionTimer = setInterval(() => {
+                    if (this.connectionStartTime) {
+                        const elapsed = Date.now() - this.connectionStartTime;
+                        const minutes = Math.floor(elapsed / 60000);
+                        const seconds = Math.floor((elapsed % 60000) / 1000);
+                        this.connectionTimeEl.textContent = 
+                            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                }, 1000);
+            }
+
+            stopConnectionTimer() {
+                if (this.connectionTimer) {
+                    clearInterval(this.connectionTimer);
+                    this.connectionTimer = null;
+                }
+                this.connectionTimeEl.textContent = '00:00';
+            }
+
+            updateStats() {
+                this.sentCountEl.textContent = this.sentCount;
+                this.receivedCountEl.textContent = this.receivedCount;
+            }
+
+            clearLog() {
+                this.messageLog.innerHTML = `
+                    <div class="message message-system">
+                        <span class="timestamp">[시스템]</span>
+                        로그가 지워졌습니다.
+                    </div>
+                `;
+                this.sentCount = 0;
+                this.receivedCount = 0;
+                this.updateStats();
+                this.lastResponseEl.textContent = '-';
+            }
+        }
+
+        // 빠른 메시지 전송 함수
+        function sendQuickMessage(message) {
+            const messageInput = document.getElementById('message-input');
+            messageInput.value = message;
+            tester.sendMessage();
+        }
+
+        // 앱 초기화
+        const tester = new ESP32TcpTester();
+
+        // 페이지 로드 시 안내 메시지
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                tester.addMessage('system', '💡 ESP32 TCP 서버와 실제 통신이 가능합니다.');
+                tester.addMessage('system', '🔧 ESP32 코드를 업로드하고 IP 주소를 확인한 후 연결하세요.');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
